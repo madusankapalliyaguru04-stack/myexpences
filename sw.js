@@ -1,5 +1,5 @@
 importScripts('core.js');
-const V='expenses-v5';
+const V='expenses-v7';
 const FILES=['./','index.html','styles.css','app.js','core.js','manifest.json','icon-192.png','icon-512.png','apple-touch-icon.png'];
 
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
