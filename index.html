@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>My Expenses</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#F2F5F3">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Expenses">
+<meta name="format-detection" content="telephone=no">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';document.documentElement.dataset.theme=t})()</script>
+<style>
+/* splash screen: inline so it paints before styles.css loads */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  background:radial-gradient(120% 90% at 50% 0%,#14967c 0%,#0E7C66 45%,#07493c 100%);color:#fff;
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;transition:opacity .5s ease,transform .5s ease,visibility .5s}
+:root[data-theme="dark"] #splash{background:radial-gradient(120% 90% at 50% 0%,#1B3A33 0%,#0E1513 60%,#070C0B 100%)}
+#splash.out{opacity:0;transform:scale(1.04);visibility:hidden;pointer-events:none}
+#splash .lg{position:relative;width:112px;height:112px;display:grid;place-items:center;margin-bottom:14px}
+#splash .lg::before,#splash .lg::after{content:"";position:absolute;inset:0;border-radius:32px;border:2px solid rgba(255,255,255,.45);animation:spPulse 2s ease-out infinite}
+#splash .lg::after{animation-delay:1s}
+#splash .lg img{position:relative;width:84px;height:84px;border-radius:24px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:spFloat 2.4s ease-in-out infinite}
+#splash h1{font-size:26px;font-weight:700;letter-spacing:.3px;animation:spUp .7s .1s both}
+#splash p{font-size:13px;opacity:.75;animation:spUp .7s .25s both}
+#splash .bar{width:150px;height:4px;border-radius:4px;background:rgba(255,255,255,.22);overflow:hidden;margin-top:26px;animation:spUp .7s .4s both}
+#splash .bar i{display:block;height:100%;width:40%;border-radius:4px;background:#fff;animation:spBar 1.2s ease-in-out infinite}
+#splash .coins{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#splash .coins span{position:absolute;bottom:-40px;font-size:22px;opacity:0;animation:spRise 5s linear infinite}
+#splash .coins span:nth-child(1){left:12%;animation-delay:0s}
+#splash .coins span:nth-child(2){left:30%;animation-delay:1.3s;font-size:18px}
+#splash .coins span:nth-child(3){left:52%;animation-delay:.6s}
+#splash .coins span:nth-child(4){left:72%;animation-delay:2s;font-size:18px}
+#splash .coins span:nth-child(5){left:88%;animation-delay:.9s}
+@keyframes spPulse{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+@keyframes spFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes spUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes spBar{0%{transform:translateX(-110%)}100%{transform:translateX(280%)}}
+@keyframes spRise{0%{transform:translateY(0) rotate(0);opacity:0}15%{opacity:.5}100%{transform:translateY(-105vh) rotate(40deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){#splash *,#splash *::before,#splash *::after{animation:none!important}}
+</style>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="splash" role="status" aria-live="polite" aria-label="Loading">
+  <div class="coins" aria-hidden="true"><span>🪙</span><span>💵</span><span>🪙</span><span>💰</span><span>🪙</span></div>
+  <div class="lg"><img src="icon-192.png" alt=""></div>
+  <h1>My Expenses</h1>
+  <p>Track every rupee, simply</p>
+  <div class="bar"><i></i></div>
+</div>
+<div id="app">
+  <header>
+    <div>
+      <h1>My Expenses</h1>
+      <div class="sub"><span id="today"></span><span id="off" class="pill" hidden>● Offline</span></div>
+    </div>
+    <div class="hb">
+      <button class="ib" id="theme" data-a="theme" aria-label="Toggle theme">🌙</button>
+      <button class="ib" data-a="settings" aria-label="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="view on" id="v-home">
+      <div class="accs" id="hAcc"></div>
+      <div class="card bal">
+        <div class="l" id="hLbl"></div>
+        <div class="n" id="hBal">Rs. 0</div>
+        <div class="row"><div>Income<b id="hIn">0</b></div><div>Expense<b id="hEx">0</b></div></div>
+      </div>
+      <h2>Recent transactions</h2>
+      <div class="card" id="hList"></div>
+    </section>
+
+    <section class="view" id="v-add">
+      <div class="seg" id="tSeg"><button class="on" data-t="e">Expense</button><button data-t="i">Income</button></div>
+      <div class="card">
+        <label>Account</label>
+        <div class="seg acctabs"></div>
+        <label for="aAmt">Amount (Rs.)</label>
+        <input id="aAmt" class="big" type="number" inputmode="decimal" step="any" placeholder="0.00" min="0">
+        <div class="lh"><label>Category</label><a data-a="editcats" id="cEdit">Edit</a></div>
+        <div class="cats" id="aCats"></div>
+        <label for="aNote">Note</label>
+        <input id="aNote" type="text" maxlength="60" placeholder="e.g. Lunch" autocomplete="off">
+        <label for="aDate">Date</label>
+        <input id="aDate" type="date">
+        <button class="btn" data-a="save">Save</button>
+      </div>
+    </section>
+
+    <section class="view" id="v-hist">
+      <div class="seg acctabs"></div>
+      <div class="mo"><button class="ib" data-m="-1" aria-label="Previous month">‹</button><b class="mLbl"></b><button class="ib" data-m="1" aria-label="Next month">›</button></div>
+      <div class="card"><div class="tot"><div>Income<b id="hsIn"></b></div><div>Expense<b id="hsEx"></b></div><div>Balance<b id="hsBl"></b></div></div></div>
+      <div class="card" id="mList"></div>
+    </section>
+
+    <section class="view" id="v-stat">
+      <div class="seg acctabs"></div>
+      <div class="seg" id="sSeg"><button class="on" data-sm="m">Monthly</button><button data-sm="r">Date range</button></div>
+      <div class="mo" id="sMo"><button class="ib" data-m="-1" aria-label="Previous month">‹</button><b class="mLbl"></b><button class="ib" data-m="1" aria-label="Next month">›</button></div>
+      <div class="dr" id="sRg" hidden><div><label for="rF">From</label><input id="rF" type="date"></div><div><label for="rT">To</label><input id="rT" type="date"></div></div>
+      <div class="card"><div class="tot"><div>Income<b id="sIn"></b></div><div>Expense<b id="sEx"></b></div><div>Balance<b id="sBl"></b></div></div></div>
+      <div class="card" id="sStats"></div>
+      <div class="card"><b>Spending by category</b><div id="sBars"></div></div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="on" data-v="home"><i>🏠</i>Home</button>
+    <button data-v="hist"><i>🧾</i>History</button>
+    <button class="add" data-v="add"><i>＋</i>Add</button>
+    <button data-v="stat"><i>📊</i>Summary</button>
+  </nav>
+</div>
+
+<div id="sheet"><div class="card" id="sheetBody"></div></div>
+<div id="toast"></div>
+<input type="file" id="imp" accept=".json,application/json" hidden>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
