@@ -23,6 +23,7 @@ const defCats=()=>({
 });
 const defAccts=()=>[{id:'a1',ic:'💵',nm:'Cash'},{id:'a2',ic:'🏦',nm:'Bank'}];
 const EMOJIS=[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment('🍽️☕🍔🍕🍎🥗🍺🛒👕👟💄🧴💡💧📱💻🌐🚌🚗⛽🚲✈️🏠🛋️🔧🧹💊🏥💪🎬🎮🎵📚🎓🐶👶🎁💼📈💰🏦💳🧾🙏🛍️🎉✂️🚬📦')].map(x=>x.segment);
+const AEMOJIS=[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment('💵🏦💳👛🪙💰🐷🏧📱💼🏠🚗✈️🎓🛒🎁📈🧾🎯🍽️💡🏥🎮👶🐶')].map(x=>x.segment);
 
 const now0=new Date();
 const S={tx:[],C:defCats(),A:defAccts(),acc:'a1',type:'e',cat:'e0',view:'home',
@@ -77,7 +78,7 @@ const itemHTML=t=>{const c=cof(t);
 
 function renderAccounts(){
   const bal=id=>S.tx.filter(t=>(t.acct||'a1')===id).reduce((s,t)=>s+(t.type==='i'?t.amt:-t.amt),0);
-  $('#hAcc').innerHTML=S.A.map(a=>`<button class="acard ${a.id===S.acc?'on':''}" data-ac="${a.id}"><span class="ic">${esc(a.ic)}</span><span><small>${esc(a.nm)}</small><b>${money(bal(a.id))}</b></span></button>`).join('');
+  $('#hAcc').innerHTML=S.A.map(a=>`<button class="acard ${a.id===S.acc?'on':''}" data-ac="${a.id}"><span class="ic">${esc(a.ic)}</span><span><small>${esc(a.nm)}</small><b>${money(bal(a.id))}</b></span></button>`).join('')+'<button class="acard plus" data-a="newacc"><span class="ic">＋</span><span><b>New account</b></span></button>';
   const tabs=S.A.map(a=>`<button class="${a.id===S.acc?'on':''}" data-ac="${a.id}">${esc(a.ic)} ${esc(a.nm)}</button>`).join('');
   $$('.acctabs').forEach(el=>el.innerHTML=tabs);
 }
@@ -174,7 +175,7 @@ async function removeCat(id){
 }
 function settingsSheet(){
   sheet(`<h3>Settings</h3>
-    <button class="btn g" data-a="rename">Rename accounts</button>
+    <button class="btn g" data-a="manage">Manage accounts</button>
     <button class="btn g" data-a="notif">🔔 Enable month-end notifications</button>
     <button class="btn g" data-a="ntest">🔔 Send a test notification</button>
     <button class="btn g" data-a="export">Back up data (download)</button>
@@ -182,11 +183,34 @@ function settingsSheet(){
     <button class="btn d" data-a="wipe">Delete all transactions</button>
     <button class="btn" data-a="close">Done</button>`);
 }
-function renameSheet(){
-  sheet(`<h3>Rename accounts</h3>${S.A.map((a,i)=>`<label for="rn${i}">${esc(a.ic)} Account ${i+1}</label><input id="rn${i}" type="text" maxlength="20" value="${esc(a.nm)}" autocomplete="off">`).join('')}
-    <button class="btn" id="rnSave">Save</button><button class="btn g" id="rnCan">Cancel</button>`);
-  $('#rnCan').onclick=settingsSheet;
-  $('#rnSave').onclick=()=>{S.A.forEach((a,i)=>{const v=$('#rn'+i).value.trim();if(v)a.nm=v});saveAccts();render();settingsSheet();toast('Saved')};
+function manageSheet(){
+  sheet(`<h3>Accounts</h3>${S.A.map(a=>`<button class="acard mrow" data-ea="${esc(a.id)}"><span class="ic">${esc(a.ic)}</span><span><b>${esc(a.nm)}</b><small>Tap to edit</small></span></button>`).join('')}
+    <button class="btn" data-a="newacc2">＋ New account</button><button class="btn g" data-a="settings">Back</button>`);
+}
+function accountSheet(id,fromManage){
+  const ed=id?S.A.find(a=>a.id===id):null,back=()=>fromManage?manageSheet():closeSheet();
+  sheet(`<h3>${ed?'Edit account':'New account'}</h3><label for="mNm">Name</label><input id="mNm" type="text" maxlength="20" placeholder="e.g. Savings, Wallet, Card" value="${ed?esc(ed.nm):''}" autocomplete="off">
+    <label for="mIc">Icon (type or pick any emoji)</label><input id="mIc" type="text" maxlength="6" value="${esc(ed?ed.ic:'💳')}"><div class="eg" id="mEg"></div>
+    <button class="btn" id="mSave">${ed?'Save':'Add'}</button>${ed&&ed.id[0]==='x'?'<button class="btn d" id="mDel">Delete account</button>':''}<button class="btn g" id="mCan">Cancel</button>`);
+  const eg=()=>$('#mEg').innerHTML=AEMOJIS.map(e=>`<button data-e="${e}" class="${e===$('#mIc').value?'on':''}">${e}</button>`).join('');
+  eg();
+  $('#mEg').onclick=e=>{const b=e.target.closest('button');if(b){$('#mIc').value=b.dataset.e;eg()}};
+  $('#mIc').oninput=eg;$('#mCan').onclick=back;
+  $('#mSave').onclick=()=>{
+    const nm=$('#mNm').value.trim(),ic=$('#mIc').value.trim();
+    if(!nm||!ic){toast('Enter a name and icon');return}
+    if(ed){ed.nm=nm;ed.ic=ic}
+    else{const n='x'+Date.now();S.A.push({id:n,ic,nm});S.acc=n;LS.set(CUR,n)}
+    saveAccts();render();back();toast('Saved');
+  };
+  const del=$('#mDel');
+  if(del)del.onclick=async()=>{
+    const n=S.tx.filter(t=>(t.acct||'a1')===id).length;
+    if(!await confirmBox('Delete account?',n?`This also deletes its ${n} transaction${n>1?'s':''}. This cannot be undone.`:'This account has no transactions.','Delete',true))return;
+    S.A=S.A.filter(a=>a.id!==id);S.tx=S.tx.filter(t=>(t.acct||'a1')!==id);
+    if(S.acc===id){S.acc='a1';LS.set(CUR,S.acc)}
+    saveAccts();saveTx();render();manageSheet();toast('Deleted');
+  };
 }
 function exportData(){
   const a=document.createElement('a');
@@ -225,6 +249,26 @@ async function testNotif(){
   r.showNotification(s.title,{body:s.body,icon:'icon-192.png',badge:'icon-192.png',tag:'test'});
 }
 
+/* ---- month-end summary message (in-app popup; the notification is sent by runCheck) ---- */
+function monthEndMsg(){
+  if($('#sheet').classList.contains('on'))return;
+  const seen=LS.get('seen_msum',[]);
+  for(const mk of dueKeys(new Date())){
+    if(seen.includes(mk)||!S.tx.some(t=>t.date.startsWith(mk)))continue;
+    const cm={};['e','i'].forEach(k=>S.C[k].forEach(c=>cm[c.id]=c.ic+' '+c.nm));
+    const m=monthSummary(S.tx,cm,mk,S.A);
+    sheet(`<h3>📅 ${esc(m.title)}</h3>${m.body.split('\n').map(l=>`<div class="st"><span style="color:var(--tx)">${esc(l)}</span></div>`).join('')}
+      <button class="btn" id="msGo">View full summary</button><button class="btn g" id="msOk">Close</button>`,
+      ()=>{seen.push(mk);LS.set('seen_msum',seen)});
+    $('#msOk').onclick=closeSheet;
+    $('#msGo').onclick=()=>{
+      const[y,mo]=mk.split('-');S.mo=new Date(+y,+mo-1,1);
+      closeSheet();$('#sSeg button[data-sm="m"]').click();go('stat');
+    };
+    return;
+  }
+}
+
 /* ---- online / offline indicator ---- */
 async function checkNet(){
   let ok=navigator.onLine;
@@ -243,6 +287,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button,a[data-a]');if(!b)return;
   const d=b.dataset;
   if(d.v)go(d.v);
+  else if(d.ea)accountSheet(d.ea,true);
   else if(d.ac){S.acc=d.ac;LS.set(CUR,S.acc);render()}
   else if(d.t){S.type=d.t;$$('#tSeg button').forEach(x=>x.classList.toggle('on',x===b));renderCats()}
   else if(d.sm){S.smode=d.sm;$$('#sSeg button').forEach(x=>x.classList.toggle('on',x===b));$('#sMo').hidden=S.smode==='r';$('#sRg').hidden=S.smode==='m';renderStat()}
@@ -256,12 +301,14 @@ document.addEventListener('click',e=>{
     case'newcat':newCatSheet();break;
     case'save':saveTransaction();break;
     case'del':deleteTx(d.id);break;
-    case'rename':renameSheet();break;
+    case'manage':manageSheet();break;
+    case'newacc':accountSheet();break;
+    case'newacc2':accountSheet(null,true);break;
     case'notif':enableNotif();break;
     case'ntest':testNotif();break;
     case'export':exportData();break;
     case'import':$('#imp').click();break;
-    case'wipe':closeSheet();confirmBox('Delete all transactions?','This permanently deletes every transaction in both accounts.','Delete everything',true)
+    case'wipe':closeSheet();confirmBox('Delete all transactions?','This permanently deletes every transaction in all accounts.','Delete everything',true)
       .then(ok=>{if(ok){S.tx=[];saveTx();render();toast('All data deleted')}});break;
   }
 });
@@ -281,7 +328,7 @@ setTheme(document.documentElement.dataset.theme);
 render();mirror();
 
 addEventListener('online',checkNet);addEventListener('offline',checkNet);
-document.addEventListener('visibilitychange',async()=>{if(!document.hidden){checkNet();render();const r=await swReg();if(r)runCheck(r)}});
+document.addEventListener('visibilitychange',async()=>{if(!document.hidden){checkNet();render();monthEndMsg();const r=await swReg();if(r)runCheck(r)}});
 setInterval(checkNet,30000);checkNet();
 
 if('serviceWorker' in navigator){
@@ -293,7 +340,7 @@ if(new URLSearchParams(location.search).get('v')==='stat')go('stat');
 {
   const sp=$('#splash');
   if(sp){
-    const hide=()=>{sp.classList.add('out');setTimeout(()=>sp.remove(),600)};
+    const hide=()=>{if(!sp.isConnected)return;sp.classList.add('out');setTimeout(()=>{sp.remove();monthEndMsg()},600)};
     const wait=Math.max(0,1400-performance.now());
     const ready=document.readyState==='complete'?Promise.resolve():new Promise(r=>addEventListener('load',r,{once:true}));
     ready.then(()=>setTimeout(hide,wait));
